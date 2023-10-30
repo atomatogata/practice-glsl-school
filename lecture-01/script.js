@@ -9,19 +9,18 @@ window.addEventListener(
 		app.init("webgl-canvas");
 		await app.load();
 
-		let timeCounter = 0;
+		let timeCount = 0;
 
 		const interval = () => {
-			app.setup(timeCounter);
+			app.setup(timeCount);
 			app.render();
-			timeCounter++;
+			timeCount++;
 		};
 		setInterval(interval, 1000);
-		// setInterval(interval, 1000 /30);
+		// setInterval(interval, 1000 / 70);
 	},
 	false
 );
-
 class WebGLApp {
 	constructor() {
 		this.canvas = null;
@@ -41,20 +40,21 @@ class WebGLApp {
 			stride: [3, 4],
 		});
 	}
-	setup(timeCounter) {
-		this.setupGeometry(timeCounter);
+	setup(timeCount) {
+		this.setupGeometry(timeCount);
 		this.resize();
 		this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
 		this.running = true;
 	}
-	setupGeometry(timeCounter) {
-		console.log(timeCounter);
+	setupGeometry(timeCount) {
+		// console.log(timeCount);
 		this.position = [];
 		this.color = [];
 
 		const matrixColor = [0.1569, 0.6627, 0.0039, 1.0];
 		const COUNT = 72;
 		let opacity = 1.0;
+		console.log(1 % 10);
 
 		for (let i = 0; i < COUNT; ++i) {
 			const x = i / (COUNT - 1);
@@ -62,17 +62,41 @@ class WebGLApp {
 			for (let j = 0; j < COUNT; ++j) {
 				const y = j / (COUNT - 1);
 				const signedY = y * 2.0 - 1.0;
-				this.position.push(signedX, signedY, 0.0);
 
-				const startIndex = timeCounter % COUNT;
-				let opacity = 1.0;
-				if ((timeCounter + 1) / 10 <= 1) {
-					opacity = (j % 72.0) * (1.0 / 72.0);
-					opacity = opacity - (((timeCounter % (10 + 1))) * 0.1);
+				/** ===========================================================================
+				 * Y軸方向に進むほどに不透明度を上げる
+				 * 1:Y軸は72個としているので、72で割ることで0.0〜1.0の範囲に収める
+				 * 2:このままだと上に向かって濃くなるので、1.0から引く（1.0から引けばなんでも逆になる！？便利や！）
+				 * ========================================================================= */
+
+				// opacity = (j % 72.0) * (1.0 / 72.0);
+				// opacity = 1.0 - (j / 72.0);
+
+				/** ===========================================================================
+				 * なんとか時間を使って、不透明度を変化させたいところだが、、、、
+				 * ========================================================================= */
+
+				// const intervalTime = 5
+				// 10秒のサイクルで（0.1ずつ）不透明度を下げる
+				// opacity = opacity - (timeCount % (intervalTime + 1)) * 0.1;
+
+				opacity = 0.0;
+				// 72種類のグラデーションのうち、必要な1個の差分
+				const countGradePercent = 1.0 / COUNT;
+
+				// jを上から0〜71に番号つけ直す
+				let sort = Math.abs(COUNT - 1 - j);
+
+				if (sort <= timeCount) {
+					opacity = sort / timeCount;
 				} else {
 					opacity = 0.0;
 				}
+				if (j == 1) {
+					opacity = 0.0;
+				}
 
+				this.position.push(signedX, signedY, 0.0);
 				this.color.push(matrixColor[0], matrixColor[1], matrixColor[2], opacity);
 			}
 		}
