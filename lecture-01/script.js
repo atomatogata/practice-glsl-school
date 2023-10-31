@@ -1,5 +1,4 @@
 import { WebGLUtility, ShaderProgram } from "../lib/webgl.min.js";
-import { Pane } from "../lib/tweakpane-4.0.0.min.js";
 
 window.addEventListener(
 	"DOMContentLoaded",
@@ -16,8 +15,8 @@ window.addEventListener(
 			app.render();
 			timeCount++;
 		};
-		setInterval(interval, 1000);
-		// setInterval(interval, 1000 / 70);
+		// setInterval(interval, 1000 );
+		setInterval(interval, 1000 / 5);
 	},
 	false
 );
@@ -54,7 +53,6 @@ class WebGLApp {
 		const matrixColor = [0.1569, 0.6627, 0.0039, 1.0];
 		const COUNT = 72;
 		let opacity = 1.0;
-		console.log(1 % 10);
 
 		for (let i = 0; i < COUNT; ++i) {
 			const x = i / (COUNT - 1);
@@ -63,37 +61,26 @@ class WebGLApp {
 				const y = j / (COUNT - 1);
 				const signedY = y * 2.0 - 1.0;
 
-				/** ===========================================================================
-				 * Y軸方向に進むほどに不透明度を上げる
-				 * 1:Y軸は72個としているので、72で割ることで0.0〜1.0の範囲に収める
-				 * 2:このままだと上に向かって濃くなるので、1.0から引く（1.0から引けばなんでも逆になる！？便利や！）
-				 * ========================================================================= */
+				const sortJ = Math.abs(COUNT - 1 - j);
 
-				// opacity = (j % 72.0) * (1.0 / 72.0);
-				// opacity = 1.0 - (j / 72.0);
+				const fadeRange = 36;
+				const currentFadeStart = timeCount % COUNT;
+				const currentFadeEnd = (currentFadeStart + fadeRange) % COUNT;
 
-				/** ===========================================================================
-				 * なんとか時間を使って、不透明度を変化させたいところだが、、、、
-				 * ========================================================================= */
-
-				// const intervalTime = 5
-				// 10秒のサイクルで（0.1ずつ）不透明度を下げる
-				// opacity = opacity - (timeCount % (intervalTime + 1)) * 0.1;
-
-				opacity = 0.0;
-				// 72種類のグラデーションのうち、必要な1個の差分
-				const countGradePercent = 1.0 / COUNT;
-
-				// jを上から0〜71に番号つけ直す
-				let sort = Math.abs(COUNT - 1 - j);
-
-				if (sort <= timeCount) {
-					opacity = sort / timeCount;
+				if (currentFadeEnd > currentFadeStart) {
+					if (sortJ >= currentFadeStart && sortJ < currentFadeEnd) {
+						opacity = (sortJ - currentFadeStart) / fadeRange;
+					} else {
+						opacity = 0.0;
+					}
 				} else {
-					opacity = 0.0;
-				}
-				if (j == 1) {
-					opacity = 0.0;
+					if (sortJ < currentFadeEnd) {
+						opacity = sortJ / fadeRange;
+					} else if (sortJ >= currentFadeStart) {
+						opacity = (sortJ - currentFadeStart) / fadeRange;
+					} else {
+						opacity = 0.0;
+					}
 				}
 
 				this.position.push(signedX, signedY, 0.0);
