@@ -43,7 +43,7 @@ class WebGLApp {
 		this.setupGeometry(timeCount);
 		this.resize();
 		this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
-		this.running = true;
+		this.running = false;
 	}
 	setupGeometry(timeCount) {
 		// console.log(timeCount);
