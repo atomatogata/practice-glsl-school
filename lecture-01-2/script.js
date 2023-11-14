@@ -1,4 +1,6 @@
 import { WebGLUtility, ShaderProgram } from "../lib/webgl.min.js";
+import { WebGLMath } from "../lib/math.js"; // 算術用クラスを追加 @@@
+import { Pane } from "../lib/tweakpane-4.0.0.min.js";
 
 window.addEventListener(
 	"DOMContentLoaded",
@@ -7,16 +9,8 @@ window.addEventListener(
 		window.addEventListener("resize", app.resize, false);
 		app.init("webgl-canvas");
 		await app.load();
-
-		let timeCount = 0;
-
-		const interval = () => {
-			app.setup(timeCount);
-			app.render();
-			timeCount++;
-		};
-		// setInterval(interval, 1000 );
-		setInterval(interval, 1000 / 5);
+		app.setup(app.timeCount);
+		app.render();
 	},
 	false
 );
@@ -25,10 +19,30 @@ class WebGLApp {
 		this.canvas = null;
 		this.gl = null;
 		this.running = false;
+		this.timeCount = 0;
 
 		this.resize = this.resize.bind(this);
 		this.render = this.render.bind(this);
+
+		this.previousTime = 0;
+		this.timeScale = 1.0;
+		this.uTime = 0.0;
+
+		// tweakpaneの初期化
+		const pane = new Pane();
+		pane
+			.addBlade({
+				view: "slider",
+				label: "time-scale",
+				min: 0.0,
+				max: 2.0,
+				value: this.timeScale,
+			})
+			.on("change", (v) => {
+				this.timeScale = v.value;
+			});
 	}
+
 	async load() {
 		const vs = await WebGLUtility.loadFile("./main.vert");
 		const fs = await WebGLUtility.loadFile("./main.frag");
@@ -37,13 +51,18 @@ class WebGLApp {
 			fragmentShaderSource: fs,
 			attribute: ["position", "color"],
 			stride: [3, 4],
+			uniform: ["time", "mvpMatrix"],
+			type: ["uniform1f", "uniformMatrix4fv"],
 		});
 	}
 	setup(timeCount) {
+		timeCount++;
+		console.log(timeCount);
 		this.setupGeometry(timeCount);
 		this.resize();
 		this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
-		this.running = false;
+		this.running = true;
+		this.previousTime = Date.now();
 	}
 	setupGeometry(timeCount) {
 		// console.log(timeCount);
@@ -96,16 +115,52 @@ class WebGLApp {
 
 	render() {
 		const gl = this.gl;
+		const m4 = WebGLMath.Mat4;
+		const v3 = WebGLMath.Vec3;
 
 		if (this.running === true) {
 			requestAnimationFrame(this.render);
 		}
 
+		// now
+		const now = Date.now();
+		// this.previousTime => setup()時のタイムスタンプ
+		const time = (now - this.previousTime) / 1000;
+
+		// 時間のスケールを考慮して、経過時間を加算 @@@
+		this.uTime += time * this.timeScale;
+		// 次のフレームで使えるように現在のタイムスタンプを保持しておく @@@
+		this.previousTime = now;
+
 		gl.viewport(0, 0, this.canvas.width, this.canvas.height);
 		gl.clear(gl.COLOR_BUFFER_BIT);
 
+		// model
+		const rotateAxis = v3.create(1.0, 0.0, 0.0); // X 軸回転を掛ける
+		// angle
+		const rotateAngle = this.uTime * 0.1;
+		const m = m4.rotate(m4.identity(), rotateAngle, rotateAxis);
+
+		// ビュー座標変換行列（ここではカメラは固定）
+		const eye = v3.create(0.0, 0.0, 3.0); // カメラの位置
+		const center = v3.create(0.0, 0.0, 0.0); // カメラの注視点
+		const upDirection = v3.create(0.0, 1.0, 0.0); // カメラの天面の向き
+		const v = m4.lookAt(eye, center, upDirection);
+
+		// プロジェクション座標変換行列
+		const fovy = 60; // 視野角（度数）
+		const aspect = this.canvas.width / this.canvas.height; // アスペクト比
+		const near = 0.1; // ニア・クリップ面までの距離
+		const far = 10.0; // ファー・クリップ面までの距離
+		const p = m4.perspective(fovy, aspect, near, far);
+
+		// 行列を乗算して MVP 行列を生成する（行列を掛ける順序に注意）
+		const vp = m4.multiply(p, v);
+		const mvp = m4.multiply(vp, m);
+
 		this.shaderProgram.use();
 		this.shaderProgram.setAttribute(this.vbo);
+		this.shaderProgram.setUniform([this.uTime, mvp]);
 
 		gl.drawArrays(gl.POINTS, 0, this.position.length / 3);
 	}

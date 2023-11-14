@@ -1,9 +1,19 @@
 attribute vec3 position;
 attribute vec4 color;
+
+uniform float time;
+uniform mat4 mvpMatrix;
+
 varying vec4 vColor;
+varying float vTime;
 
 void main() {
   vColor = color;
-  gl_Position = vec4(position, 1.0);
-  gl_PointSize = 10.0;
+  vTime = time;
+  gl_PointSize = 5.0;
+
+  float s = sin(position.x + time);
+  vec3 p = position + vec3(0.0,0.0,s);
+  
+  gl_Position = mvpMatrix * vec4(p, 1.0);
 }
