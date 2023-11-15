@@ -27,6 +27,7 @@ class WebGLApp {
 		this.previousTime = 0;
 		this.timeScale = 1.0;
 		this.uTime = 0.0;
+		this.uRatio = 0.0;
 
 		// tweakpaneの初期化
 		const pane = new Pane();
@@ -41,6 +42,17 @@ class WebGLApp {
 			.on("change", (v) => {
 				this.timeScale = v.value;
 			});
+		pane
+			.addBlade({
+				view: "slider",
+				label: "ratio",
+				min: 0.0,
+				max: 1.0,
+				value: this.uRatio,
+			})
+			.on("change", (v) => {
+				this.uRatio = v.value;
+			});
 	}
 
 	async load() {
@@ -49,10 +61,10 @@ class WebGLApp {
 		this.shaderProgram = new ShaderProgram(this.gl, {
 			vertexShaderSource: vs,
 			fragmentShaderSource: fs,
-			attribute: ["position", "color"],
-			stride: [3, 4],
-			uniform: ["time", "mvpMatrix"],
-			type: ["uniform1f", "uniformMatrix4fv"],
+			attribute: ["planePosition", "spherePosition", "color"],
+			stride: [3, 3, 4],
+			uniform: ["ratio", "time", "mvpMatrix"],
+			type: ["uniform1f", "uniform1f", "uniformMatrix4fv"],
 		});
 	}
 	setup(timeCount) {
@@ -63,52 +75,53 @@ class WebGLApp {
 		this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
 		this.running = true;
 		this.previousTime = Date.now();
+
+		this.gl.clearColor(0.1, 0.1, 0.1, 1.0);
+		this.gl.clearDepth(1.0);
+		this.gl.enable(this.gl.DEPTH_TEST);
 	}
 	setupGeometry(timeCount) {
 		// console.log(timeCount);
-		this.position = [];
+		const COUNT = 72;
+		const RADIUS = 1.0;
+		const matrixColor = [0.1569, 0.6627, 0.0039, 1.0];
+		this.planePosition = [];
+		this.spherePosition = [];
 		this.color = [];
 
-		const matrixColor = [0.1569, 0.6627, 0.0039, 1.0];
-		const COUNT = 72;
-		let opacity = 1.0;
-
-		for (let i = 0; i < COUNT; ++i) {
-			const x = i / (COUNT - 1);
-			const signedX = x * 2.0 - 1.0;
-			for (let j = 0; j < COUNT; ++j) {
-				const y = j / (COUNT - 1);
-				const signedY = y * 2.0 - 1.0;
-
-				const sortJ = Math.abs(COUNT - 1 - j);
-
-				const fadeRange = 36;
-				const currentFadeStart = timeCount % COUNT;
-				const currentFadeEnd = (currentFadeStart + fadeRange) % COUNT;
-
-				if (currentFadeEnd > currentFadeStart) {
-					if (sortJ >= currentFadeStart && sortJ < currentFadeEnd) {
-						opacity = (sortJ - currentFadeStart) / fadeRange;
-					} else {
-						opacity = 0.0;
-					}
-				} else {
-					if (sortJ < currentFadeEnd) {
-						opacity = sortJ / fadeRange;
-					} else if (sortJ >= currentFadeStart) {
-						opacity = (sortJ - currentFadeStart) / fadeRange;
-					} else {
-						opacity = 0.0;
-					}
+		{
+			for (let i = 0; i < COUNT; ++i) {
+				const x = i / (COUNT - 1);
+				const signedX = x * 2.0 - 1.0;
+				for (let j = 0; j < COUNT; ++j) {
+					const y = j / (COUNT - 1);
+					const signedY = y * 2.0 - 1.0;
+					this.planePosition.push(signedX, signedY, 0.0);
+					this.color.push(matrixColor[0], matrixColor[1], matrixColor[2], 1.0);
 				}
-
-				this.position.push(signedX, signedY, 0.0);
-				this.color.push(matrixColor[0], matrixColor[1], matrixColor[2], opacity);
 			}
 		}
-
+		// sphere
+		{
+			for (let i = 0; i < COUNT; ++i){
+				const iRad = (i / COUNT) * Math.PI * 2.0;
+				const x = Math.sin(iRad);
+				const y = Math.cos(iRad);
+				for (let j = 0; j < COUNT; ++j){
+					const jRad = (j / COUNT) * Math.PI;
+					const r = Math.sin(jRad);
+					const z = Math.cos(jRad);
+					this.spherePosition.push(
+						x * RADIUS * r,
+						y * RADIUS,
+						z * RADIUS * r
+					);
+				}
+			}
+		}
 		this.vbo = [
-			WebGLUtility.createVbo(this.gl, this.position),
+			WebGLUtility.createVbo(this.gl, this.planePosition),
+			WebGLUtility.createVbo(this.gl, this.spherePosition),
 			WebGLUtility.createVbo(this.gl, this.color),
 		];
 	}
@@ -122,14 +135,9 @@ class WebGLApp {
 			requestAnimationFrame(this.render);
 		}
 
-		// now
 		const now = Date.now();
-		// this.previousTime => setup()時のタイムスタンプ
 		const time = (now - this.previousTime) / 1000;
-
-		// 時間のスケールを考慮して、経過時間を加算 @@@
 		this.uTime += time * this.timeScale;
-		// 次のフレームで使えるように現在のタイムスタンプを保持しておく @@@
 		this.previousTime = now;
 
 		gl.viewport(0, 0, this.canvas.width, this.canvas.height);
@@ -160,9 +168,9 @@ class WebGLApp {
 
 		this.shaderProgram.use();
 		this.shaderProgram.setAttribute(this.vbo);
-		this.shaderProgram.setUniform([this.uTime, mvp]);
+		this.shaderProgram.setUniform([this.uRatio,this.uTime, mvp]);
 
-		gl.drawArrays(gl.POINTS, 0, this.position.length / 3);
+		gl.drawArrays(gl.POINTS, 0, this.planePosition.length / 3);
 	}
 	resize() {
 		this.canvas.width = window.innerWidth;
